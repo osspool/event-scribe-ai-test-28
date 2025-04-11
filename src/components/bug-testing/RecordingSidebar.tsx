@@ -103,18 +103,17 @@ export const RecordingSidebar = ({
                 variant={isRecording ? "destructive" : "default"}
                 onClick={isRecording ? stopRecording : startRecording}
                 className={cn(
-                  "w-full flex items-center justify-center",
-                  collapsed ? "p-0 h-10 w-10" : ""
+                  collapsed ? "p-0 h-10 w-10" : "w-full flex items-center justify-center gap-2"
                 )}
               >
                 {isRecording ? (
                   <>
-                    {!collapsed && <span className="mr-2">Stop Recording</span>}
+                    {!collapsed && "Stop Recording"}
                     <CircleOff className="h-5 w-5" />
                   </>
                 ) : (
                   <>
-                    {!collapsed && <span className="mr-2">Start Recording</span>}
+                    {!collapsed && "Start Recording"}
                     <Circle className="h-5 w-5" />
                   </>
                 )}
@@ -134,12 +133,11 @@ export const RecordingSidebar = ({
                   variant={isAssertionMode ? "secondary" : "outline"} 
                   onClick={toggleAssertionMode}
                   className={cn(
-                    "w-full flex items-center justify-center",
-                    collapsed ? "p-0 h-10 w-10" : "",
+                    collapsed ? "p-0 h-10 w-10" : "w-full flex items-center justify-center gap-2",
                     isAssertionMode ? "bg-indigo-700 hover:bg-indigo-800 text-white" : ""
                   )}
                 >
-                  {!collapsed && <span className="mr-2">Add Assertion</span>}
+                  {!collapsed && "Add Assertion"}
                   <Eye className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
@@ -159,11 +157,10 @@ export const RecordingSidebar = ({
                     variant="outline"
                     onClick={exportEvents}
                     className={cn(
-                      "w-full flex items-center justify-center",
-                      collapsed ? "p-0 h-10 w-10" : ""
+                      collapsed ? "p-0 h-10 w-10" : "w-full flex items-center justify-center gap-2"
                     )}
                   >
-                    {!collapsed && <span className="mr-2">Export Events</span>}
+                    {!collapsed && "Export Events"}
                     <Download className="h-5 w-5" />
                   </Button>
                 </TooltipTrigger>
@@ -180,11 +177,10 @@ export const RecordingSidebar = ({
                     variant="outline"
                     onClick={clearEvents}
                     className={cn(
-                      "w-full flex items-center justify-center",
-                      collapsed ? "p-0 h-10 w-10" : ""
+                      collapsed ? "p-0 h-10 w-10" : "w-full flex items-center justify-center gap-2"
                     )}
                   >
-                    {!collapsed && <span className="mr-2">Clear Events</span>}
+                    {!collapsed && "Clear Events"}
                     <Trash2 className="h-5 w-5" />
                   </Button>
                 </TooltipTrigger>
@@ -207,10 +203,10 @@ export const RecordingSidebar = ({
             <Button
               variant="ghost"
               size="sm"
-              className="w-full text-sm flex items-center justify-center"
+              className="w-full text-sm flex items-center justify-center gap-2"
               onClick={() => setShowEvents(!showEvents)}
             >
-              <span className="mr-2">{showEvents ? "Hide Events" : "Show Events"}</span>
+              {showEvents ? "Hide Events" : "Show Events"}
               <List className="h-4 w-4" />
             </Button>
           </div>
