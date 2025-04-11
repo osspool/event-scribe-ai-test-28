@@ -139,6 +139,27 @@ class EventRecorderClass {
   }
   
   /**
+   * Check if element should be excluded from recording
+   */
+  private shouldExcludeElement(element: HTMLElement): boolean {
+    // Check for exclusion attribute on element or any parent
+    const excluded = element.closest('[data-recording-exclude="true"]');
+    
+    if (excluded) {
+      return true;
+    }
+    
+    // Exclude specific element types that shouldn't be recorded
+    if (element.classList.contains('recording-overlay') || 
+        element.tagName === 'HTML' || 
+        element.tagName === 'BODY') {
+      return true;
+    }
+    
+    return false;
+  }
+  
+  /**
    * Generate a CSS selector for an element
    */
   private generateSelector(element: HTMLElement): string {
@@ -195,6 +216,11 @@ class EventRecorderClass {
     
     const mouseEvent = event as MouseEvent;
     const target = mouseEvent.target as HTMLElement;
+    
+    // Skip recording if element should be excluded
+    if (this.shouldExcludeElement(target)) {
+      return;
+    }
     
     this.recordEvent({
       type: 'click',

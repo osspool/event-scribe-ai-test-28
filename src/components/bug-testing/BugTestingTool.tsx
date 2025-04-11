@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { RecordingSidebar } from "./RecordingSidebar";
 import { RecordingOverlay } from "./RecordingOverlay";
 import { EventRecorder } from "@/lib/event-recorder";
@@ -12,6 +12,26 @@ export const BugTestingTool = () => {
   const [events, setEvents] = useState<any[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [recordingPaused, setRecordingPaused] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  
+  // Filter function to exclude events from sidebar and empty areas
+  const shouldRecordEvent = (event: any) => {
+    // Don't record if the event source is the sidebar or its children
+    if (sidebarRef.current && 
+        (event.target === sidebarRef.current || sidebarRef.current.contains(event.target))) {
+      return false;
+    }
+    
+    // Don't record clicks on empty areas (those without a meaningful selector)
+    if (event.type === 'click' && 
+        (event.selector === 'body' || 
+         event.selector === 'html' || 
+         event.selector.includes('.flex-1.relative.overflow-auto'))) {
+      return false;
+    }
+    
+    return true;
+  };
 
   // Effect to handle recording state when assertion mode changes
   useEffect(() => {
@@ -24,7 +44,9 @@ export const BugTestingTool = () => {
     } else if (!isAssertionMode && isRecording && recordingPaused) {
       // Resume recording when exiting assertion mode if it was paused
       EventRecorder.start((event) => {
-        setEvents((prev) => [...prev, event]);
+        if (shouldRecordEvent(event)) {
+          setEvents((prev) => [...prev, event]);
+        }
       });
       setRecordingPaused(false);
       
@@ -36,7 +58,9 @@ export const BugTestingTool = () => {
     setIsRecording(true);
     if (!isAssertionMode) {
       EventRecorder.start((event) => {
-        setEvents((prev) => [...prev, event]);
+        if (shouldRecordEvent(event)) {
+          setEvents((prev) => [...prev, event]);
+        }
       });
       
       toast({
@@ -86,7 +110,9 @@ export const BugTestingTool = () => {
       // Resume recording if it was paused for assertion mode
       if (isRecording && recordingPaused) {
         EventRecorder.start((event) => {
-          setEvents((prev) => [...prev, event]);
+          if (shouldRecordEvent(event)) {
+            setEvents((prev) => [...prev, event]);
+          }
         });
         setRecordingPaused(false);
         
@@ -155,18 +181,20 @@ export const BugTestingTool = () => {
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
-      <RecordingSidebar
-        isRecording={isRecording}
-        isAssertionMode={isAssertionMode}
-        events={events}
-        startRecording={startRecording}
-        stopRecording={stopRecording}
-        toggleAssertionMode={toggleAssertionMode}
-        exportEvents={exportEvents}
-        clearEvents={clearEvents}
-        collapsed={sidebarCollapsed}
-        setCollapsed={setSidebarCollapsed}
-      />
+      <div ref={sidebarRef} className="sidebar-container" data-recording-exclude="true">
+        <RecordingSidebar
+          isRecording={isRecording}
+          isAssertionMode={isAssertionMode}
+          events={events}
+          startRecording={startRecording}
+          stopRecording={stopRecording}
+          toggleAssertionMode={toggleAssertionMode}
+          exportEvents={exportEvents}
+          clearEvents={clearEvents}
+          collapsed={sidebarCollapsed}
+          setCollapsed={setSidebarCollapsed}
+        />
+      </div>
       
       <div className="flex-1 relative overflow-auto">
         {isRecording && (

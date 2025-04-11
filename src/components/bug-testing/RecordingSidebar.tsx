@@ -11,7 +11,9 @@ import {
   ArrowLeft, 
   Check, 
   FileText,
-  List
+  List,
+  Bug,
+  BugOff
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +55,7 @@ export const RecordingSidebar = ({
       case "input":
         return <FileText className="h-4 w-4" />;
       case "assertion":
-        return <Check className="h-4 w-4" />;
+        return <Check className="h-4 w-4 text-purple-400" />;
       default:
         return null;
     }
@@ -74,13 +76,19 @@ export const RecordingSidebar = ({
 
   return (
     <div
+      data-recording-exclude="true"
       className={cn(
         "bg-slate-900 text-white flex flex-col transition-all duration-300 border-r border-slate-700",
         collapsed ? "w-16" : "w-72"
       )}
     >
       <div className="flex justify-between items-center p-4 border-b border-slate-700">
-        {!collapsed && <h2 className="font-semibold">Bug Testing Tool</h2>}
+        {!collapsed && (
+          <div className="flex items-center gap-2">
+            <Bug className="h-5 w-5 text-purple-400" />
+            <h2 className="font-semibold">Bug Testing Tool</h2>
+          </div>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -103,18 +111,21 @@ export const RecordingSidebar = ({
                 variant={isRecording ? "destructive" : "default"}
                 onClick={isRecording ? stopRecording : startRecording}
                 className={cn(
-                  collapsed ? "p-0 h-10 w-10" : "w-full flex items-center justify-center gap-2"
+                  collapsed ? "p-0 h-10 w-10" : "w-full flex items-center justify-center gap-2",
+                  isRecording 
+                    ? "bg-red-600 hover:bg-red-700 text-white" 
+                    : "bg-purple-600 hover:bg-purple-700 text-white"
                 )}
               >
                 {isRecording ? (
                   <>
                     {!collapsed && "Stop Recording"}
-                    <CircleOff className="h-5 w-5" />
+                    <BugOff className="h-5 w-5" />
                   </>
                 ) : (
                   <>
                     {!collapsed && "Start Recording"}
-                    <Circle className="h-5 w-5" />
+                    <Bug className="h-5 w-5" />
                   </>
                 )}
               </Button>
@@ -134,7 +145,9 @@ export const RecordingSidebar = ({
                   onClick={toggleAssertionMode}
                   className={cn(
                     collapsed ? "p-0 h-10 w-10" : "w-full flex items-center justify-center gap-2",
-                    isAssertionMode ? "bg-indigo-700 hover:bg-indigo-800 text-white" : ""
+                    isAssertionMode 
+                      ? "bg-indigo-700 hover:bg-indigo-800 text-white" 
+                      : "border-indigo-500 text-indigo-300 hover:bg-indigo-900 hover:text-white"
                   )}
                 >
                   {!collapsed && "Add Assertion"}
@@ -157,7 +170,8 @@ export const RecordingSidebar = ({
                     variant="outline"
                     onClick={exportEvents}
                     className={cn(
-                      collapsed ? "p-0 h-10 w-10" : "w-full flex items-center justify-center gap-2"
+                      collapsed ? "p-0 h-10 w-10" : "w-full flex items-center justify-center gap-2",
+                      "border-teal-500 text-teal-300 hover:bg-teal-900 hover:text-white"
                     )}
                   >
                     {!collapsed && "Export Events"}
@@ -177,7 +191,8 @@ export const RecordingSidebar = ({
                     variant="outline"
                     onClick={clearEvents}
                     className={cn(
-                      collapsed ? "p-0 h-10 w-10" : "w-full flex items-center justify-center gap-2"
+                      collapsed ? "p-0 h-10 w-10" : "w-full flex items-center justify-center gap-2",
+                      "border-rose-500 text-rose-300 hover:bg-rose-900 hover:text-white"
                     )}
                   >
                     {!collapsed && "Clear Events"}
@@ -198,12 +213,14 @@ export const RecordingSidebar = ({
           <div className="p-4 border-t border-slate-700">
             <div className="flex justify-between items-center mb-2">
               <h3 className="font-medium">Recorded Events</h3>
-              <Badge variant="outline">{events.length}</Badge>
+              <Badge variant="outline" className="bg-purple-900 text-purple-100">
+                {events.length}
+              </Badge>
             </div>
             <Button
               variant="ghost"
               size="sm"
-              className="w-full text-sm flex items-center justify-center gap-2"
+              className="w-full text-sm flex items-center justify-center gap-2 text-slate-300 hover:text-white hover:bg-slate-800"
               onClick={() => setShowEvents(!showEvents)}
             >
               {showEvents ? "Hide Events" : "Show Events"}
@@ -217,7 +234,12 @@ export const RecordingSidebar = ({
                 {events.map((event, index) => (
                   <div
                     key={index}
-                    className="text-xs bg-slate-800 p-2 rounded border border-slate-700"
+                    className={cn(
+                      "text-xs p-2 rounded border",
+                      event.type === "assertion" 
+                        ? "bg-purple-900/40 border-purple-700 text-purple-100" 
+                        : "bg-slate-800 border-slate-700 text-slate-200"
+                    )}
                   >
                     <div className="flex items-center gap-2">
                       {getEventIcon(event)}
