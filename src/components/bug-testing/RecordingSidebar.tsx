@@ -78,8 +78,8 @@ export const RecordingSidebar = ({
     <div
       data-recording-exclude="true"
       className={cn(
-        "bg-slate-900 text-white flex flex-col transition-all duration-300 border-r border-slate-700",
-        collapsed ? "w-16" : "w-72"
+        "bg-slate-900 text-white flex flex-col h-full transition-all duration-300 border-r border-slate-700",
+        collapsed ? "w-16" : "w-80"
       )}
     >
       <div className="flex justify-between items-center p-4 border-b border-slate-700">
@@ -229,7 +229,7 @@ export const RecordingSidebar = ({
           </div>
 
           {showEvents && (
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1 border-t border-slate-700/50">
               <div className="p-4 space-y-2">
                 {events.map((event, index) => (
                   <div
@@ -243,7 +243,7 @@ export const RecordingSidebar = ({
                   >
                     <div className="flex items-center gap-2">
                       {getEventIcon(event)}
-                      <span>{getEventDescription(event)}</span>
+                      <span className="text-white">{getEventDescription(event)}</span>
                     </div>
                   </div>
                 ))}

@@ -181,7 +181,7 @@ export const BugTestingTool = () => {
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
-      <div ref={sidebarRef} className="sidebar-container" data-recording-exclude="true">
+      <div ref={sidebarRef} className="h-full" data-recording-exclude="true">
         <RecordingSidebar
           isRecording={isRecording}
           isAssertionMode={isAssertionMode}
