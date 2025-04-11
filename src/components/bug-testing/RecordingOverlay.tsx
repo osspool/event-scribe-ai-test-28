@@ -26,6 +26,7 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
   const [assertionValue, setAssertionValue] = useState("");
   const [popoverOpen, setPopoverOpen] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const [elementRect, setElementRect] = useState<DOMRect | null>(null);
 
   useEffect(() => {
     if (!isAssertionMode) {
@@ -33,6 +34,28 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
       setPopoverOpen(false);
     }
   }, [isAssertionMode]);
+
+  // Update element position when it might have moved (for floating elements)
+  useEffect(() => {
+    if (!selectedElement) return;
+    
+    const updateElementPosition = () => {
+      if (selectedElement) {
+        setElementRect(selectedElement.getBoundingClientRect());
+      }
+    };
+    
+    // Update initially and then on various events that might cause repositioning
+    updateElementPosition();
+    
+    window.addEventListener('scroll', updateElementPosition);
+    window.addEventListener('resize', updateElementPosition);
+    
+    return () => {
+      window.removeEventListener('scroll', updateElementPosition);
+      window.removeEventListener('resize', updateElementPosition);
+    };
+  }, [selectedElement]);
 
   // Generate a unique selector for the element
   const generateSelector = (element: HTMLElement): string => {
@@ -47,6 +70,13 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
         .filter(c => c && !c.includes('hover') && !c.includes('focus'));
       if (classes.length > 0) {
         return `.${classes[0]}`;
+      }
+    }
+    
+    // Try data attributes
+    for (const attr of Array.from(element.attributes)) {
+      if (attr.name.startsWith('data-')) {
+        return `[${attr.name}="${attr.value}"]`;
       }
     }
     
@@ -71,6 +101,7 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     setSelectedElement(target);
     const selector = generateSelector(target);
     setSelectedSelector(selector);
+    setElementRect(target.getBoundingClientRect());
     setPopoverOpen(true);
     
     toast({
@@ -121,78 +152,93 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
         </div>
       )}
       
-      {isAssertionMode && selectedElement && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="default" className="gap-2">
-                {getAssertionIcon()}
-                Add Assertion
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80">
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-medium">Create Assertion</h3>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => setPopoverOpen(false)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Element Selector</Label>
-                  <Input 
-                    value={selectedSelector} 
-                    onChange={(e) => setSelectedSelector(e.target.value)}
-                    className="font-mono text-sm"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Assertion Type</Label>
-                  <Select 
-                    value={assertionType} 
-                    onValueChange={setAssertionType}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select assertion type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="isVisible">Is Visible</SelectItem>
-                      <SelectItem value="isClickable">Is Clickable</SelectItem>
-                      <SelectItem value="hasText">Has Text</SelectItem>
-                      <SelectItem value="hasValue">Has Value</SelectItem>
-                      <SelectItem value="exists">Exists</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {(assertionType === "hasText" || assertionType === "hasValue") && (
-                  <div className="space-y-2">
-                    <Label>Expected Value</Label>
-                    <Input 
-                      value={assertionValue} 
-                      onChange={(e) => setAssertionValue(e.target.value)}
-                      placeholder="Enter expected value"
-                    />
-                  </div>
-                )}
-                
-                <Button 
-                  className="w-full"
-                  onClick={handleSubmitAssertion}
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
+      {isAssertionMode && selectedElement && elementRect && (
+        <>
+          {/* Element highlight overlay */}
+          <div 
+            className="absolute bg-blue-500 bg-opacity-30 border-2 border-blue-500 pointer-events-none z-40"
+            style={{
+              left: `${elementRect.left}px`,
+              top: `${elementRect.top}px`,
+              width: `${elementRect.width}px`,
+              height: `${elementRect.height}px`,
+              position: 'fixed'
+            }}
+          />
+          
+          {/* Assertion popover */}
+          <div className="fixed bottom-4 right-4 z-50">
+            <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="default" className="gap-2">
+                  {getAssertionIcon()}
                   Add Assertion
                 </Button>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-80">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-medium">Create Assertion</h3>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setPopoverOpen(false)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Element Selector</Label>
+                    <Input 
+                      value={selectedSelector} 
+                      onChange={(e) => setSelectedSelector(e.target.value)}
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Assertion Type</Label>
+                    <Select 
+                      value={assertionType} 
+                      onValueChange={setAssertionType}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select assertion type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="isVisible">Is Visible</SelectItem>
+                        <SelectItem value="isClickable">Is Clickable</SelectItem>
+                        <SelectItem value="hasText">Has Text</SelectItem>
+                        <SelectItem value="hasValue">Has Value</SelectItem>
+                        <SelectItem value="exists">Exists</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {(assertionType === "hasText" || assertionType === "hasValue") && (
+                    <div className="space-y-2">
+                      <Label>Expected Value</Label>
+                      <Input 
+                        value={assertionValue} 
+                        onChange={(e) => setAssertionValue(e.target.value)}
+                        placeholder="Enter expected value"
+                      />
+                    </div>
+                  )}
+                  
+                  <Button 
+                    className="w-full"
+                    onClick={handleSubmitAssertion}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Add Assertion
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </>
       )}
       
       {isAssertionMode && (

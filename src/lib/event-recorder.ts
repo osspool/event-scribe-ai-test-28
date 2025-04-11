@@ -378,16 +378,17 @@ class EventRecorderClass {
   private handleScroll(event: Event): void {
     if (!this.recording) return;
     
-    const target = event.target as HTMLElement;
+    // Fixed type error: properly type-check if target is Document or HTMLElement
+    const target = event.target as Node;
     const isWindow = target === document || target === document.documentElement || target === document.body;
     
     this.recordEvent({
       type: 'scroll',
       timestamp: Date.now(),
-      selector: isWindow ? 'window' : this.generateSelector(target),
+      selector: isWindow ? 'window' : this.generateSelector(target as HTMLElement),
       metadata: {
-        scrollX: isWindow ? window.scrollX : target.scrollLeft,
-        scrollY: isWindow ? window.scrollY : target.scrollTop
+        scrollX: isWindow ? window.scrollX : (target as HTMLElement).scrollLeft,
+        scrollY: isWindow ? window.scrollY : (target as HTMLElement).scrollTop
       }
     });
   }
