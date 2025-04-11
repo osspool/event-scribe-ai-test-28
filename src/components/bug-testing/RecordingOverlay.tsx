@@ -1,5 +1,6 @@
+
 import { useState, useRef, useEffect } from "react";
-import { X, CheckCircle2, Eye, MousePointerClick, FileText, Search, Hand, Type } from "lucide-react";
+import { X, CheckCircle2, Eye, MousePointerClick, FileText, Search, Hand, Type, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
@@ -31,12 +32,15 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
   const [inspectingPath, setInspectingPath] = useState<HTMLElement[]>([]);
   const [selectorOptions, setSelectorOptions] = useState<string[]>([]);
   const [dynamicElementInfo, setDynamicElementInfo] = useState<{isToast?: boolean, isDropdown?: boolean}>({});
+  const [selectionFeedbackVisible, setSelectionFeedbackVisible] = useState(false);
+  const [selectionAnimating, setSelectionAnimating] = useState(false);
 
   useEffect(() => {
     if (!isAssertionMode) {
       setSelectedElement(null);
       setPopoverOpen(false);
       setInspectingPath([]);
+      setSelectionFeedbackVisible(false);
     } else {
       // Show help dialog on first use of assertion mode
       const hasSeenHelp = localStorage.getItem('assertionHelpSeen');
@@ -74,9 +78,23 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     };
   }, [selectedElement]);
 
+  // Visual feedback animation for successful selection
+  useEffect(() => {
+    if (selectedElement && elementRect) {
+      setSelectionFeedbackVisible(true);
+      setSelectionAnimating(true);
+      
+      const timer = setTimeout(() => {
+        setSelectionAnimating(false);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [selectedElement, elementRect]);
+
   // Track elements under mouse for hover effect
   const handleElementHover = (e: React.MouseEvent) => {
-    if (!isAssertionMode) return;
+    if (!isAssertionMode || selectedElement) return;
     
     const target = e.target as HTMLElement;
     if (target === overlayRef.current) return;
@@ -209,6 +227,11 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     setPopoverOpen(true);
     setInspectingPath([]);
     
+    // Play selection animation
+    setSelectionFeedbackVisible(true);
+    setSelectionAnimating(true);
+    setTimeout(() => setSelectionAnimating(false), 1000);
+    
     toast({
       title: "Element Selected",
       description: `Selected ${dynamicInfo.isToast ? 'toast' : dynamicInfo.isDropdown ? 'dropdown' : 'element'} with selector: ${selectorOpts[0] || "unknown"}`,
@@ -223,6 +246,7 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     setPopoverOpen(false);
     setSelectedElement(null);
     setAssertionValue("");
+    setSelectionFeedbackVisible(false);
     
     toast({
       title: "Assertion Added",
@@ -332,11 +356,14 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
           </>
         )}
         
+        {/* Show clear selected element highlight with animation */}
         {isAssertionMode && selectedElement && elementRect && (
           <>
-            {/* Element highlight overlay */}
+            {/* Element highlight overlay with animation */}
             <div 
-              className="fixed bg-indigo-600 bg-opacity-30 border-2 border-indigo-600 pointer-events-none z-40"
+              className={`fixed bg-indigo-600 pointer-events-none z-40 transition-all duration-500 ${
+                selectionAnimating ? 'bg-opacity-50 border-4 shadow-lg shadow-indigo-500/50' : 'bg-opacity-30 border-2'
+              } border-indigo-600`}
               style={{
                 left: `${elementRect.left}px`,
                 top: `${elementRect.top}px`,
@@ -344,6 +371,22 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
                 height: `${elementRect.height}px`
               }}
             />
+
+            {/* Selection indicator label */}
+            <div 
+              className={`fixed z-[60] bg-indigo-800 text-white px-3 py-1 rounded-md shadow-lg font-medium text-sm flex items-center gap-1 transition-opacity duration-300 ${
+                selectionFeedbackVisible ? 'opacity-100' : 'opacity-0'
+              }`}
+              style={{
+                left: `${elementRect.left + elementRect.width + 10}px`,
+                top: `${elementRect.top + (elementRect.height / 2) - 12}px`,
+                transform: 'translateY(-50%)'
+              }}
+            >
+              <CheckCircle2 className="h-4 w-4 text-green-400" />
+              <span>Selected</span>
+              <ArrowRight className="h-3 w-3 ml-1" />
+            </div>
             
             {/* Assertion popover */}
             <div className="fixed bottom-4 right-4 z-[100]">
@@ -351,7 +394,7 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
                 <PopoverTrigger asChild>
                   <Button 
                     variant="default" 
-                    className="gap-2 bg-indigo-700 hover:bg-indigo-800"
+                    className="gap-2 bg-indigo-700 hover:bg-indigo-800 animate-pulse"
                     data-assertion-control="true"
                   >
                     {getAssertionIcon()}
