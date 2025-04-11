@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect } from "react";
-import { X, CheckCircle2, Eye, MousePointerClick, FileText } from "lucide-react";
+import { X, CheckCircle2, Eye, MousePointerClick, FileText, Search, Hand, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface RecordingOverlayProps {
   isAssertionMode: boolean;
@@ -25,13 +26,24 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
   const [assertionType, setAssertionType] = useState("isVisible");
   const [assertionValue, setAssertionValue] = useState("");
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const [elementRect, setElementRect] = useState<DOMRect | null>(null);
+  const [inspectingPath, setInspectingPath] = useState<HTMLElement[]>([]);
+  const [selectorOptions, setSelectorOptions] = useState<string[]>([]);
 
   useEffect(() => {
     if (!isAssertionMode) {
       setSelectedElement(null);
       setPopoverOpen(false);
+      setInspectingPath([]);
+    } else {
+      // Show help dialog on first use of assertion mode
+      const hasSeenHelp = localStorage.getItem('assertionHelpSeen');
+      if (!hasSeenHelp) {
+        setHelpDialogOpen(true);
+        localStorage.setItem('assertionHelpSeen', 'true');
+      }
     }
   }, [isAssertionMode]);
 
@@ -50,42 +62,75 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     
     window.addEventListener('scroll', updateElementPosition);
     window.addEventListener('resize', updateElementPosition);
+    window.addEventListener('mousemove', updateElementPosition);
+    
+    const animationFrame = setInterval(updateElementPosition, 200); // Regular updates for animated elements
     
     return () => {
       window.removeEventListener('scroll', updateElementPosition);
       window.removeEventListener('resize', updateElementPosition);
+      window.removeEventListener('mousemove', updateElementPosition);
+      clearInterval(animationFrame);
     };
   }, [selectedElement]);
 
-  // Generate a unique selector for the element
-  const generateSelector = (element: HTMLElement): string => {
-    // Try to use ID
-    if (element.id) {
-      return `#${element.id}`;
+  // Track elements under mouse for hover effect
+  const handleElementHover = (e: React.MouseEvent) => {
+    if (!isAssertionMode) return;
+    
+    const target = e.target as HTMLElement;
+    if (target === overlayRef.current) return;
+    
+    // Create path from target to document body
+    const path: HTMLElement[] = [];
+    let currentElement: HTMLElement | null = target;
+    
+    while (currentElement && currentElement !== document.body) {
+      path.push(currentElement);
+      currentElement = currentElement.parentElement;
     }
     
-    // Try to use a unique class
+    setInspectingPath(path);
+  };
+
+  // Generate multiple selector options for the element
+  const generateSelectorOptions = (element: HTMLElement): string[] => {
+    const options: string[] = [];
+    
+    // ID selector (highest priority)
+    if (element.id) {
+      options.push(`#${element.id}`);
+    }
+    
+    // Data attributes
+    for (const attr of Array.from(element.attributes)) {
+      if (attr.name.startsWith('data-')) {
+        options.push(`[${attr.name}="${attr.value}"]`);
+      }
+    }
+    
+    // Class selector (if classes exist)
     if (element.className && typeof element.className === 'string') {
       const classes = element.className.split(' ')
         .filter(c => c && !c.includes('hover') && !c.includes('focus'));
       if (classes.length > 0) {
-        return `.${classes[0]}`;
+        options.push(`.${classes.join('.')}`);
       }
     }
     
-    // Try data attributes
-    for (const attr of Array.from(element.attributes)) {
-      if (attr.name.startsWith('data-')) {
-        return `[${attr.name}="${attr.value}"]`;
-      }
-    }
-    
-    // Use tag name and position
+    // Tag with position
     const tagName = element.tagName.toLowerCase();
     const siblings = Array.from(element.parentNode?.children || []);
     const index = siblings.indexOf(element) + 1;
+    options.push(`${tagName}:nth-child(${index})`);
     
-    return `${tagName}:nth-child(${index})`;
+    // Tag with text content (for text elements)
+    const textContent = element.textContent?.trim();
+    if (textContent && textContent.length < 20) {
+      options.push(`${tagName}:contains("${textContent}")`);
+    }
+    
+    return options;
   };
 
   const handleElementSelection = (e: React.MouseEvent) => {
@@ -99,14 +144,16 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     if (target === overlayRef.current) return;
     
     setSelectedElement(target);
-    const selector = generateSelector(target);
-    setSelectedSelector(selector);
+    const selectorOpts = generateSelectorOptions(target);
+    setSelectorOptions(selectorOpts);
+    setSelectedSelector(selectorOpts[0] || "");
     setElementRect(target.getBoundingClientRect());
     setPopoverOpen(true);
+    setInspectingPath([]);
     
     toast({
       title: "Element Selected",
-      description: `Selected element with selector: ${selector}`,
+      description: `Selected element with selector: ${selectorOpts[0] || "unknown"}`,
       duration: 3000,
     });
   };
@@ -134,116 +181,245 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
         return <MousePointerClick className="h-4 w-4" />;
       case "hasText":
         return <FileText className="h-4 w-4" />;
+      case "hasValue":
+        return <Type className="h-4 w-4" />;
+      case "exists":
+        return <Search className="h-4 w-4" />;
       default:
         return <CheckCircle2 className="h-4 w-4" />;
     }
   };
 
   return (
-    <div 
-      ref={overlayRef}
-      className={`absolute inset-0 z-50 ${isAssertionMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
-      onClick={handleElementSelection}
-    >
-      {isAssertionMode && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white py-2 px-4 rounded-full z-50 flex items-center gap-2 shadow-lg">
-          <Eye className="h-4 w-4" />
-          <span>Click on an element to create an assertion</span>
-        </div>
-      )}
-      
-      {isAssertionMode && selectedElement && elementRect && (
-        <>
-          {/* Element highlight overlay */}
-          <div 
-            className="absolute bg-blue-500 bg-opacity-30 border-2 border-blue-500 pointer-events-none z-40"
-            style={{
-              left: `${elementRect.left}px`,
-              top: `${elementRect.top}px`,
-              width: `${elementRect.width}px`,
-              height: `${elementRect.height}px`,
-              position: 'fixed'
-            }}
-          />
-          
-          {/* Assertion popover */}
-          <div className="fixed bottom-4 right-4 z-50">
-            <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="default" className="gap-2">
-                  {getAssertionIcon()}
-                  Add Assertion
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-medium">Create Assertion</h3>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => setPopoverOpen(false)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Element Selector</Label>
-                    <Input 
-                      value={selectedSelector} 
-                      onChange={(e) => setSelectedSelector(e.target.value)}
-                      className="font-mono text-sm"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Assertion Type</Label>
-                    <Select 
-                      value={assertionType} 
-                      onValueChange={setAssertionType}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select assertion type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="isVisible">Is Visible</SelectItem>
-                        <SelectItem value="isClickable">Is Clickable</SelectItem>
-                        <SelectItem value="hasText">Has Text</SelectItem>
-                        <SelectItem value="hasValue">Has Value</SelectItem>
-                        <SelectItem value="exists">Exists</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  {(assertionType === "hasText" || assertionType === "hasValue") && (
-                    <div className="space-y-2">
-                      <Label>Expected Value</Label>
-                      <Input 
-                        value={assertionValue} 
-                        onChange={(e) => setAssertionValue(e.target.value)}
-                        placeholder="Enter expected value"
-                      />
-                    </div>
-                  )}
-                  
-                  <Button 
-                    className="w-full"
-                    onClick={handleSubmitAssertion}
-                  >
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
+    <>
+      <div 
+        ref={overlayRef}
+        className={`absolute inset-0 z-50 ${isAssertionMode ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
+        onClick={handleElementSelection}
+        onMouseMove={handleElementHover}
+      >
+        {isAssertionMode && (
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-indigo-900 text-white py-2 px-6 rounded-full z-50 flex items-center gap-2 shadow-lg border border-indigo-700">
+            <Eye className="h-5 w-5 text-indigo-300" />
+            <span>Click on any element to add assertion</span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="ml-2 h-6 text-xs text-indigo-300 hover:text-white hover:bg-indigo-800"
+              onClick={(e) => {
+                e.stopPropagation();
+                setHelpDialogOpen(true);
+              }}
+            >
+              Need help?
+            </Button>
+          </div>
+        )}
+        
+        {/* Highlight elements on hover */}
+        {isAssertionMode && inspectingPath.length > 0 && !selectedElement && (
+          <>
+            {inspectingPath.map((element, index) => {
+              const rect = element.getBoundingClientRect();
+              const isTopElement = index === 0;
+              
+              return (
+                <div 
+                  key={index}
+                  className={`absolute border-2 pointer-events-none z-${50 - index} ${
+                    isTopElement 
+                      ? 'border-indigo-500 bg-indigo-500 bg-opacity-10' 
+                      : 'border-blue-300 border-opacity-40'
+                  }`}
+                  style={{
+                    left: `${rect.left}px`,
+                    top: `${rect.top}px`,
+                    width: `${rect.width}px`,
+                    height: `${rect.height}px`,
+                    position: 'fixed'
+                  }}
+                />
+              );
+            })}
+          </>
+        )}
+        
+        {isAssertionMode && selectedElement && elementRect && (
+          <>
+            {/* Element highlight overlay */}
+            <div 
+              className="fixed bg-indigo-600 bg-opacity-30 border-2 border-indigo-600 pointer-events-none z-40"
+              style={{
+                left: `${elementRect.left}px`,
+                top: `${elementRect.top}px`,
+                width: `${elementRect.width}px`,
+                height: `${elementRect.height}px`
+              }}
+            />
+            
+            {/* Assertion popover */}
+            <div className="fixed bottom-4 right-4 z-50">
+              <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="default" className="gap-2 bg-indigo-700 hover:bg-indigo-800">
+                    {getAssertionIcon()}
                     Add Assertion
                   </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-        </>
-      )}
+                </PopoverTrigger>
+                <PopoverContent className="w-96 p-4 border-indigo-300 bg-slate-900 text-white">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center border-b border-slate-700 pb-2">
+                      <h3 className="font-medium text-indigo-300">Create Assertion</h3>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => setPopoverOpen(false)}
+                        className="text-slate-400 hover:text-white hover:bg-slate-800"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-slate-300">Element Selector</Label>
+                      <Select 
+                        value={selectedSelector} 
+                        onValueChange={setSelectedSelector}
+                      >
+                        <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                          <SelectValue placeholder="Select element selector" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-800 border-slate-700 text-white">
+                          {selectorOptions.map((option, index) => (
+                            <SelectItem key={index} value={option} className="hover:bg-slate-700 focus:bg-slate-700">
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-slate-400">
+                        Choose the most specific selector for reliable test runs
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-slate-300">Assertion Type</Label>
+                      <Select 
+                        value={assertionType} 
+                        onValueChange={setAssertionType}
+                      >
+                        <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                          <SelectValue placeholder="Select assertion type" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-800 border-slate-700 text-white">
+                          <SelectItem value="isVisible" className="hover:bg-slate-700 focus:bg-slate-700">
+                            <div className="flex items-center gap-2">
+                              <Eye className="h-4 w-4 text-indigo-400" />
+                              <span>Is Visible</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="isClickable" className="hover:bg-slate-700 focus:bg-slate-700">
+                            <div className="flex items-center gap-2">
+                              <MousePointerClick className="h-4 w-4 text-indigo-400" />
+                              <span>Is Clickable</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="hasText" className="hover:bg-slate-700 focus:bg-slate-700">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-indigo-400" />
+                              <span>Has Text</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="hasValue" className="hover:bg-slate-700 focus:bg-slate-700">
+                            <div className="flex items-center gap-2">
+                              <Type className="h-4 w-4 text-indigo-400" />
+                              <span>Has Value</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="exists" className="hover:bg-slate-700 focus:bg-slate-700">
+                            <div className="flex items-center gap-2">
+                              <Search className="h-4 w-4 text-indigo-400" />
+                              <span>Exists</span>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {(assertionType === "hasText" || assertionType === "hasValue") && (
+                      <div className="space-y-2">
+                        <Label className="text-slate-300">Expected Value</Label>
+                        <Input 
+                          value={assertionValue} 
+                          onChange={(e) => setAssertionValue(e.target.value)}
+                          placeholder="Enter expected value"
+                          className="bg-slate-800 border-slate-700 text-white"
+                        />
+                      </div>
+                    )}
+                    
+                    <Button 
+                      className="w-full bg-indigo-700 hover:bg-indigo-800 text-white"
+                      onClick={handleSubmitAssertion}
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Add Assertion
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </>
+        )}
+        
+        {isAssertionMode && !selectedElement && (
+          <div className="absolute inset-0 bg-indigo-500 bg-opacity-5 border-2 border-indigo-500 border-opacity-30 pointer-events-none" />
+        )}
+      </div>
       
-      {isAssertionMode && (
-        <div className="absolute inset-0 bg-blue-500 bg-opacity-10 border-2 border-blue-500 pointer-events-none" />
-      )}
-    </div>
+      {/* Help Dialog */}
+      <Dialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen}>
+        <DialogContent className="bg-slate-900 text-white border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-indigo-300">How to Add Assertions</DialogTitle>
+            <DialogDescription className="text-slate-300">
+              Assertions verify that elements behave as expected during testing.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <div className="flex items-start gap-3 p-3 bg-slate-800 rounded">
+              <div className="mt-1"><MousePointerClick className="h-5 w-5 text-indigo-400" /></div>
+              <div>
+                <h4 className="font-semibold mb-1">Select an Element</h4>
+                <p className="text-slate-300">Click on any element in your app to create an assertion about it.</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3 p-3 bg-slate-800 rounded">
+              <div className="mt-1"><Hand className="h-5 w-5 text-indigo-400" /></div>
+              <div>
+                <h4 className="font-semibold mb-1">Choose a Selector</h4>
+                <p className="text-slate-300">We'll generate selector options based on the element's attributes. Pick the most specific one for reliable tests.</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3 p-3 bg-slate-800 rounded">
+              <div className="mt-1"><CheckCircle2 className="h-5 w-5 text-indigo-400" /></div>
+              <div>
+                <h4 className="font-semibold mb-1">Define Your Assertion</h4>
+                <p className="text-slate-300">Select what you want to verify about the element (visibility, text content, etc) and add any expected values.</p>
+              </div>
+            </div>
+            
+            <Button 
+              className="w-full mt-4 bg-indigo-700 hover:bg-indigo-800"
+              onClick={() => setHelpDialogOpen(false)}
+            >
+              Got it
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };

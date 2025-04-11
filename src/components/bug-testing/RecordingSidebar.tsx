@@ -10,7 +10,8 @@ import {
   Trash2, 
   ArrowLeft, 
   Check, 
-  FileText
+  FileText,
+  List
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -101,17 +102,20 @@ export const RecordingSidebar = ({
               <Button
                 variant={isRecording ? "destructive" : "default"}
                 onClick={isRecording ? stopRecording : startRecording}
-                className={cn("w-full", collapsed && "w-8 h-8 p-0")}
+                className={cn(
+                  "w-full flex items-center justify-center",
+                  collapsed ? "p-0 h-10 w-10" : ""
+                )}
               >
                 {isRecording ? (
                   <>
-                    {!collapsed && "Stop Recording"}
-                    <CircleOff className={cn("h-5 w-5", collapsed ? "mx-auto" : "ml-2")} />
+                    {!collapsed && <span className="mr-2">Stop Recording</span>}
+                    <CircleOff className="h-5 w-5" />
                   </>
                 ) : (
                   <>
-                    {!collapsed && "Start Recording"}
-                    <Circle className={cn("h-5 w-5", collapsed ? "mx-auto" : "ml-2")} />
+                    {!collapsed && <span className="mr-2">Start Recording</span>}
+                    <Circle className="h-5 w-5" />
                   </>
                 )}
               </Button>
@@ -129,10 +133,14 @@ export const RecordingSidebar = ({
                 <Button
                   variant={isAssertionMode ? "secondary" : "outline"} 
                   onClick={toggleAssertionMode}
-                  className={cn("w-full", collapsed && "w-8 h-8 p-0")}
+                  className={cn(
+                    "w-full flex items-center justify-center",
+                    collapsed ? "p-0 h-10 w-10" : "",
+                    isAssertionMode ? "bg-indigo-700 hover:bg-indigo-800 text-white" : ""
+                  )}
                 >
-                  {!collapsed && "Add Assertion"}
-                  <Eye className={cn("h-5 w-5", collapsed ? "mx-auto" : "ml-2")} />
+                  {!collapsed && <span className="mr-2">Add Assertion</span>}
+                  <Eye className="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">
@@ -150,10 +158,13 @@ export const RecordingSidebar = ({
                   <Button
                     variant="outline"
                     onClick={exportEvents}
-                    className={cn("w-full", collapsed && "w-8 h-8 p-0")}
+                    className={cn(
+                      "w-full flex items-center justify-center",
+                      collapsed ? "p-0 h-10 w-10" : ""
+                    )}
                   >
-                    {!collapsed && "Export Events"}
-                    <Download className={cn("h-5 w-5", collapsed ? "mx-auto" : "ml-2")} />
+                    {!collapsed && <span className="mr-2">Export Events</span>}
+                    <Download className="h-5 w-5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="right">
@@ -168,10 +179,13 @@ export const RecordingSidebar = ({
                   <Button
                     variant="outline"
                     onClick={clearEvents}
-                    className={cn("w-full", collapsed && "w-8 h-8 p-0")}
+                    className={cn(
+                      "w-full flex items-center justify-center",
+                      collapsed ? "p-0 h-10 w-10" : ""
+                    )}
                   >
-                    {!collapsed && "Clear Events"}
-                    <Trash2 className={cn("h-5 w-5", collapsed ? "mx-auto" : "ml-2")} />
+                    {!collapsed && <span className="mr-2">Clear Events</span>}
+                    <Trash2 className="h-5 w-5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="right">
@@ -193,10 +207,11 @@ export const RecordingSidebar = ({
             <Button
               variant="ghost"
               size="sm"
-              className="w-full text-sm"
+              className="w-full text-sm flex items-center justify-center"
               onClick={() => setShowEvents(!showEvents)}
             >
-              {showEvents ? "Hide Events" : "Show Events"}
+              <span className="mr-2">{showEvents ? "Hide Events" : "Show Events"}</span>
+              <List className="h-4 w-4" />
             </Button>
           </div>
 
