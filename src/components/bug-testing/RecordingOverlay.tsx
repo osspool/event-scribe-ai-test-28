@@ -107,10 +107,19 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     
     const elements = getElementsFromPoint(e.clientX, e.clientY);
     
-    const targetElements = elements.filter(el => 
-      !overlayRef.current?.contains(el) && 
-      el !== overlayRef.current
-    );
+    const targetElements = elements.filter(el => {
+      if (el === overlayRef.current) return false;
+      if (el.closest('[data-assertion-control="true"]')) return false;
+      if (el.closest('[data-help-button="true"]')) return false;
+      
+      if (el.closest('[class*="fixed top-4"]')) return false;
+      
+      if (overlayRef.current?.contains(el)) return false;
+      
+      if (el.className?.includes('relative overflow-auto') && el.className?.includes('flex-1')) return false;
+      
+      return true;
+    });
     
     if (targetElements.length === 0) return;
     
@@ -213,6 +222,10 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
       
       if (el.closest('[class*="fixed top-4"]')) return false;
       
+      if (overlayRef.current?.contains(el)) return false;
+      
+      if (el.className?.includes('relative overflow-auto') && el.className?.includes('flex-1')) return false;
+      
       return true;
     });
     
@@ -302,9 +315,10 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
         className={`absolute inset-0 z-50 ${isAssertionMode ? 'pointer-events-auto cursor-crosshair' : 'pointer-events-none'}`}
         onClick={handleElementSelection}
         onMouseMove={handleElementHover}
+        style={{ pointerEvents: isAssertionMode ? 'all' : 'none' }}
       >
         {isAssertionMode && (
-          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-indigo-900 text-white py-2 px-6 rounded-full z-50 flex items-center gap-2 shadow-lg border border-indigo-700">
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-indigo-900 text-white py-2 px-6 rounded-full z-50 flex items-center gap-2 shadow-lg border border-indigo-700" data-assertion-control="true">
             <Eye className="h-5 w-5 text-indigo-300" />
             <span>Click on any element to add assertion</span>
             <Button 
@@ -326,6 +340,10 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
         <div 
           className="absolute inset-0 z-[51]" 
           onClick={handleButtonClick}
+          style={{ 
+            pointerEvents: isAssertionMode ? 'all' : 'none',
+            cursor: 'crosshair' 
+          }}
         ></div>
         
         {isAssertionMode && inspectingPath.length > 0 && !selectedElement && (
@@ -378,13 +396,14 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
                 top: `${elementRect.top + (elementRect.height / 2) - 12}px`,
                 transform: 'translateY(-50%)'
               }}
+              data-assertion-control="true"
             >
               <CheckCircle2 className="h-4 w-4 text-green-400" />
               <span>Selected</span>
               <ArrowRight className="h-3 w-3 ml-1" />
             </div>
             
-            <div className="fixed bottom-4 right-4 z-[100]">
+            <div className="fixed bottom-4 right-4 z-[100]" data-assertion-control="true">
               <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button 

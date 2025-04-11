@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RecordingSidebar } from "./RecordingSidebar";
 import { RecordingOverlay } from "./RecordingOverlay";
 import { EventRecorder } from "@/lib/event-recorder";
@@ -12,6 +12,25 @@ export const BugTestingTool = () => {
   const [events, setEvents] = useState<any[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [recordingPaused, setRecordingPaused] = useState(false);
+
+  // Effect to handle recording state when assertion mode changes
+  useEffect(() => {
+    if (isAssertionMode && isRecording) {
+      // Pause recording when entering assertion mode
+      EventRecorder.stop();
+      setRecordingPaused(true);
+      
+      console.log("Recording paused for assertion mode");
+    } else if (!isAssertionMode && isRecording && recordingPaused) {
+      // Resume recording when exiting assertion mode if it was paused
+      EventRecorder.start((event) => {
+        setEvents((prev) => [...prev, event]);
+      });
+      setRecordingPaused(false);
+      
+      console.log("Recording resumed after assertion mode");
+    }
+  }, [isAssertionMode, isRecording, recordingPaused]);
 
   const startRecording = () => {
     setIsRecording(true);
