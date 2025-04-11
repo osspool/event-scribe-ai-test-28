@@ -106,6 +106,8 @@ export const BugTestingTool = () => {
   };
 
   const addAssertion = (type: string, selector: string, value?: string) => {
+    console.log("Adding assertion:", type, selector, value);
+    
     const assertion = {
       type: "assertion",
       assertionType: type,

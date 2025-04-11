@@ -255,10 +255,14 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     });
   };
 
-  const handleSubmitAssertion = () => {
+  const handleSubmitAssertion = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (!selectedSelector) return;
     
     addAssertion(assertionType, selectedSelector, assertionValue);
+    
     setPopoverOpen(false);
     setSelectedElement(null);
     setAssertionValue("");
@@ -294,8 +298,7 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     const elements = getElementsFromPoint(e.clientX, e.clientY);
     
     const isControlButton = elements.some(el => 
-      el.tagName === 'BUTTON' && 
-      el.hasAttribute('data-assertion-control')
+      el.closest('[data-assertion-control="true"]') !== null
     );
     
     if (isControlButton) {
@@ -306,6 +309,13 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     e.stopPropagation();
     
     handleElementSelection(e);
+  };
+
+  const handleClosePopover = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    setPopoverOpen(false);
   };
 
   return (
@@ -428,7 +438,7 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        onClick={() => setPopoverOpen(false)}
+                        onClick={handleClosePopover}
                         className="text-slate-400 hover:text-white hover:bg-slate-800"
                         data-assertion-control="true"
                       >
