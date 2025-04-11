@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { X, CheckCircle2, Eye, MousePointerClick, FileText, Search, Hand, Type, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { EventRecorder } from "@/lib/event-recorder";
 
 interface RecordingOverlayProps {
   isAssertionMode: boolean;
@@ -34,6 +34,16 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
   const [dynamicElementInfo, setDynamicElementInfo] = useState<{isToast?: boolean, isDropdown?: boolean}>({});
   const [selectionFeedbackVisible, setSelectionFeedbackVisible] = useState(false);
   const [selectionAnimating, setSelectionAnimating] = useState(false);
+  const [wasRecordingPaused, setWasRecordingPaused] = useState(false);
+
+  useEffect(() => {
+    if (isAssertionMode) {
+      EventRecorder.stop();
+      setWasRecordingPaused(true);
+    } else if (wasRecordingPaused) {
+      setWasRecordingPaused(false);
+    }
+  }, [isAssertionMode]);
 
   useEffect(() => {
     if (!isAssertionMode) {
@@ -42,7 +52,6 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
       setInspectingPath([]);
       setSelectionFeedbackVisible(false);
     } else {
-      // Show help dialog on first use of assertion mode
       const hasSeenHelp = localStorage.getItem('assertionHelpSeen');
       if (!hasSeenHelp) {
         setHelpDialogOpen(true);
@@ -51,7 +60,6 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     }
   }, [isAssertionMode]);
 
-  // Update element position when it might have moved (for floating elements)
   useEffect(() => {
     if (!selectedElement) return;
     
@@ -61,14 +69,13 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
       }
     };
     
-    // Update initially and then on various events that might cause repositioning
     updateElementPosition();
     
     window.addEventListener('scroll', updateElementPosition);
     window.addEventListener('resize', updateElementPosition);
     window.addEventListener('mousemove', updateElementPosition);
     
-    const animationFrame = setInterval(updateElementPosition, 100); // More frequent updates for better tracking
+    const animationFrame = setInterval(updateElementPosition, 100);
     
     return () => {
       window.removeEventListener('scroll', updateElementPosition);
@@ -78,7 +85,6 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     };
   }, [selectedElement]);
 
-  // Visual feedback animation for successful selection
   useEffect(() => {
     if (selectedElement && elementRect) {
       setSelectionFeedbackVisible(true);
@@ -92,14 +98,24 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     }
   }, [selectedElement, elementRect]);
 
-  // Track elements under mouse for hover effect
+  const getElementsFromPoint = (x: number, y: number): HTMLElement[] => {
+    return document.elementsFromPoint(x, y) as HTMLElement[];
+  };
+
   const handleElementHover = (e: React.MouseEvent) => {
     if (!isAssertionMode || selectedElement) return;
     
-    const target = e.target as HTMLElement;
-    if (target === overlayRef.current) return;
+    const elements = getElementsFromPoint(e.clientX, e.clientY);
     
-    // Create path from target to document body
+    const targetElements = elements.filter(el => 
+      !overlayRef.current?.contains(el) && 
+      el !== overlayRef.current
+    );
+    
+    if (targetElements.length === 0) return;
+    
+    const target = targetElements[0];
+    
     const path: HTMLElement[] = [];
     let currentElement: HTMLElement | null = target;
     
@@ -111,14 +127,11 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     setInspectingPath(path);
   };
 
-  // Detect if element is a toast, dropdown or other dynamic element
   const detectDynamicElement = (element: HTMLElement) => {
-    // Check for toast
     const isToast = element.closest('[role="alert"]') !== null || 
                     element.closest('[toast]') !== null ||
                     element.closest('[data-radix-toast-root]') !== null;
     
-    // Check for dropdown
     const isDropdown = element.closest('[role="menu"]') !== null || 
                        element.closest('[role="listbox"]') !== null ||
                        element.closest('[data-radix-dropdown-menu-content]') !== null ||
@@ -127,66 +140,54 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     return { isToast, isDropdown };
   };
 
-  // Generate multiple selector options for the element
   const generateSelectorOptions = (element: HTMLElement): string[] => {
     const options: string[] = [];
     
-    // ID selector (highest priority)
     if (element.id) {
       options.push(`#${element.id}`);
     }
     
-    // Role attribute (good for accessibility and consistent across implementations)
     const role = element.getAttribute('role');
     if (role) {
       options.push(`[role="${role}"]`);
     }
     
-    // Data attributes (good for component libraries like Radix)
     for (const attr of Array.from(element.attributes)) {
       if (attr.name.startsWith('data-')) {
         options.push(`[${attr.name}="${attr.value}"]`);
       }
     }
     
-    // Aria attributes (good for component libraries and accessibility)
     for (const attr of Array.from(element.attributes)) {
       if (attr.name.startsWith('aria-')) {
         options.push(`[${attr.name}="${attr.value}"]`);
       }
     }
     
-    // Class selector (if classes exist)
     if (element.className && typeof element.className === 'string') {
       const classes = element.className.split(' ')
         .filter(c => c && !c.includes('hover') && !c.includes('focus'));
       
       if (classes.length > 0) {
-        // Add individual classes and combinations
         if (classes.length === 1) {
           options.push(`.${classes[0]}`);
         } else {
-          // Add the first class as an option
           options.push(`.${classes[0]}`);
-          // Add a more specific selector with multiple classes
           options.push(`.${classes.slice(0, Math.min(3, classes.length)).join('.')}`);
         }
       }
     }
     
-    // Tag with specific text content (for text elements)
     const textContent = element.textContent?.trim();
     if (textContent && textContent.length < 30 && textContent.length > 0) {
       const tagName = element.tagName.toLowerCase();
       options.push(`${tagName}:contains("${textContent.substring(0, 20)}")`);
     }
     
-    // Tag with position
     const tagName = element.tagName.toLowerCase();
     const siblings = Array.from(element.parentNode?.children || []);
     const index = siblings.indexOf(element) + 1;
     
-    // Add parent context for more specificity
     if (element.parentElement && element.parentElement !== document.body) {
       const parentTag = element.parentElement.tagName.toLowerCase();
       options.push(`${parentTag} > ${tagName}:nth-child(${index})`);
@@ -200,22 +201,25 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
   const handleElementSelection = (e: React.MouseEvent) => {
     if (!isAssertionMode) return;
     
-    // Stop event propagation to prevent button clicks and other events
     e.preventDefault();
     e.stopPropagation();
     
-    // Get the target element, but skip the overlay itself
-    const target = e.target as HTMLElement;
-    if (target === overlayRef.current) return;
+    const elements = getElementsFromPoint(e.clientX, e.clientY);
     
-    // Check if we're clicking on the "Need help" button or another UI control
-    const isHelpButton = target.closest('[data-help-button="true"]');
-    if (isHelpButton) {
-      // Allow the button click to go through without selecting the element
-      return;
-    }
+    const targetElements = elements.filter(el => {
+      if (el === overlayRef.current) return false;
+      if (el.closest('[data-assertion-control="true"]')) return false;
+      if (el.closest('[data-help-button="true"]')) return false;
+      
+      if (el.closest('[class*="fixed top-4"]')) return false;
+      
+      return true;
+    });
     
-    // Check if target is a dynamic element (toast, dropdown)
+    if (targetElements.length === 0) return;
+    
+    const target = targetElements[0];
+    
     const dynamicInfo = detectDynamicElement(target);
     setDynamicElementInfo(dynamicInfo);
     
@@ -227,7 +231,6 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     setPopoverOpen(true);
     setInspectingPath([]);
     
-    // Play selection animation
     setSelectionFeedbackVisible(true);
     setSelectionAnimating(true);
     setTimeout(() => setSelectionAnimating(false), 1000);
@@ -272,23 +275,23 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
     }
   };
 
-  // Handle buttons and interactive elements specially
   const handleButtonClick = (e: React.MouseEvent) => {
     if (!isAssertionMode) return;
     
-    const target = e.target as HTMLElement;
-    const button = target.closest('button');
+    const elements = getElementsFromPoint(e.clientX, e.clientY);
     
-    // If this is a UI control button for our overlay, don't prevent default
-    if (button && button.hasAttribute('data-assertion-control')) {
+    const isControlButton = elements.some(el => 
+      el.tagName === 'BUTTON' && 
+      el.hasAttribute('data-assertion-control')
+    );
+    
+    if (isControlButton) {
       return;
     }
     
-    // Otherwise prevent the button click during assertion mode
     e.preventDefault();
     e.stopPropagation();
     
-    // And proceed with element selection
     handleElementSelection(e);
   };
 
@@ -320,15 +323,11 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
           </div>
         )}
         
-        {/* Capture clicks on buttons specifically to prevent them from firing */}
-        {isAssertionMode && (
-          <div 
-            className="absolute inset-0 z-[51]" 
-            onClick={handleButtonClick}
-          ></div>
-        )}
+        <div 
+          className="absolute inset-0 z-[51]" 
+          onClick={handleButtonClick}
+        ></div>
         
-        {/* Highlight elements on hover */}
         {isAssertionMode && inspectingPath.length > 0 && !selectedElement && (
           <>
             {inspectingPath.map((element, index) => {
@@ -356,10 +355,8 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
           </>
         )}
         
-        {/* Show clear selected element highlight with animation */}
         {isAssertionMode && selectedElement && elementRect && (
           <>
-            {/* Element highlight overlay with animation */}
             <div 
               className={`fixed bg-indigo-600 pointer-events-none z-40 transition-all duration-500 ${
                 selectionAnimating ? 'bg-opacity-50 border-4 shadow-lg shadow-indigo-500/50' : 'bg-opacity-30 border-2'
@@ -372,7 +369,6 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
               }}
             />
 
-            {/* Selection indicator label */}
             <div 
               className={`fixed z-[60] bg-indigo-800 text-white px-3 py-1 rounded-md shadow-lg font-medium text-sm flex items-center gap-1 transition-opacity duration-300 ${
                 selectionFeedbackVisible ? 'opacity-100' : 'opacity-0'
@@ -388,7 +384,6 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
               <ArrowRight className="h-3 w-3 ml-1" />
             </div>
             
-            {/* Assertion popover */}
             <div className="fixed bottom-4 right-4 z-[100]">
               <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                 <PopoverTrigger asChild>
@@ -520,7 +515,6 @@ export const RecordingOverlay = ({ isAssertionMode, addAssertion }: RecordingOve
         )}
       </div>
       
-      {/* Help Dialog */}
       <Dialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen}>
         <DialogContent className="bg-slate-900 text-white border-slate-700 z-[200]">
           <DialogHeader>

@@ -11,24 +11,28 @@ export const BugTestingTool = () => {
   const [isAssertionMode, setIsAssertionMode] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [recordingPaused, setRecordingPaused] = useState(false);
 
   const startRecording = () => {
     setIsRecording(true);
-    EventRecorder.start((event) => {
-      setEvents((prev) => [...prev, event]);
-    });
-    
-    toast({
-      title: "Recording Started",
-      description: "All user interactions are now being recorded",
-      duration: 3000,
-    });
+    if (!isAssertionMode) {
+      EventRecorder.start((event) => {
+        setEvents((prev) => [...prev, event]);
+      });
+      
+      toast({
+        title: "Recording Started",
+        description: "All user interactions are now being recorded",
+        duration: 3000,
+      });
+    }
   };
 
   const stopRecording = () => {
     setIsRecording(false);
     setIsAssertionMode(false);
     EventRecorder.stop();
+    setRecordingPaused(false);
     
     toast({
       title: "Recording Stopped",
@@ -40,20 +44,45 @@ export const BugTestingTool = () => {
   };
 
   const toggleAssertionMode = () => {
-    setIsAssertionMode(!isAssertionMode);
-    
+    // If turning assertion mode on
     if (!isAssertionMode) {
+      // Pause the recording when entering assertion mode
+      if (isRecording && !recordingPaused) {
+        EventRecorder.stop();
+        setRecordingPaused(true);
+      }
+      
+      setIsAssertionMode(true);
+      
       toast({
         title: "Assertion Mode Enabled",
-        description: "Click on elements to add assertions",
+        description: "Click on elements to add assertions. Recording paused.",
         duration: 3000,
       });
-    } else {
-      toast({
-        title: "Assertion Mode Disabled",
-        description: "Continuing with event recording",
-        duration: 3000,
-      });
+    } 
+    // If turning assertion mode off
+    else {
+      setIsAssertionMode(false);
+      
+      // Resume recording if it was paused for assertion mode
+      if (isRecording && recordingPaused) {
+        EventRecorder.start((event) => {
+          setEvents((prev) => [...prev, event]);
+        });
+        setRecordingPaused(false);
+        
+        toast({
+          title: "Assertion Mode Disabled",
+          description: "Recording resumed",
+          duration: 3000,
+        });
+      } else {
+        toast({
+          title: "Assertion Mode Disabled",
+          description: "Continuing with event recording",
+          duration: 3000,
+        });
+      }
     }
   };
 
@@ -67,7 +96,6 @@ export const BugTestingTool = () => {
     };
     
     setEvents((prev) => [...prev, assertion]);
-    setIsAssertionMode(false);
     
     toast({
       title: "Assertion Added",
